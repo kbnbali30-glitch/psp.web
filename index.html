@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PSP ISO Engine - Local File</title>
+    <style>
+        :root {
+            --bg-dark: #09090b;
+            --card-bg: #121216;
+            --neon-red: #ff003c;
+            --neon-cyan: #00f3ff;
+            --text-main: #f4f4f5;
+            --text-muted: #a1a1aa;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: none;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        header {
+            background: linear-gradient(90deg, #0d0d11, #18080c);
+            padding: 14px 18px;
+            border-bottom: 2px solid var(--neon-red);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(255, 0, 60, 0.2);
+        }
+
+        .logo { font-size: 1.2rem; font-weight: 900; letter-spacing: 1px; }
+        .logo span { color: var(--neon-red); text-shadow: 0 0 10px rgba(255, 0, 60, 0.7); }
+        
+        .badge-group { display: flex; gap: 8px; align-items: center; }
+        .iso-badge { background: rgba(255, 0, 60, 0.15); border: 1px solid var(--neon-red); color: #ff6b8b; padding: 3px 9px; border-radius: 14px; font-size: 0.75rem; font-weight: bold; }
+        .fps-badge { background: rgba(0, 243, 255, 0.1); border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 3px 9px; border-radius: 14px; font-size: 0.75rem; font-weight: bold; }
+
+        .container { flex: 1; padding: 14px; max-width: 960px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 14px; }
+
+        .upload-zone {
+            background: var(--card-bg);
+            border: 2px dashed #27272a;
+            border-radius: 16px;
+            padding: 28px 18px;
+            text-align: center;
+            transition: all 0.25s ease;
+            cursor: pointer;
+        }
+
+        .upload-zone:hover, .upload-zone.dragover { border-color: var(--neon-red); background: #171014; }
+        .upload-icon { font-size: 2.4rem; margin-bottom: 8px; }
+        .upload-title { font-size: 1.08rem; font-weight: bold; margin-bottom: 4px; }
+        .upload-sub { font-size: 0.82rem; color: var(--text-muted); }
+        #isoInput { display: none; }
+
+        .settings-panel { background: var(--card-bg); border-radius: 14px; padding: 14px; border: 1px solid #27272a; }
+        .panel-title { font-size: 0.92rem; color: var(--neon-cyan); margin-bottom: 12px; font-weight: bold; }
+        .settings-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        .setting-item { display: flex; flex-direction: column; gap: 5px; }
+        .setting-item label { font-size: 0.8rem; color: var(--text-muted); }
+        select { background: #1c1c22; color: #fff; border: 1px solid #3f3f46; padding: 10px; border-radius: 8px; font-size: 0.85rem; outline: none; width: 100%; }
+        
+        .status-bar { background: #141418; padding: 10px 14px; border-radius: 10px; font-size: 0.8rem; color: var(--text-muted); border-right: 3px solid var(--neon-cyan); }
+
+        /* منطقة اللعب */
+        #game-wrapper { display: none; flex-direction: column; gap: 10px; width: 100%; height: 100vh; position: fixed; inset: 0; background: #000; z-index: 1000; padding: 8px; }
+        .screen-container { position: relative; flex: 1; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid #27272a; }
+        #game { width: 100%; height: 100%; }
+
+        .toolbar { display: flex; justify-content: space-between; gap: 8px; }
+        .btn { background: #1c1c22; color: #fff; border: 1px solid #3f3f46; padding: 8px 14px; border-radius: 8px; font-size: 0.8rem; font-weight: bold; cursor: pointer; flex: 1; text-align: center; }
+        .btn-cyan { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+        .btn-red { border-color: var(--neon-red); color: #ff6b8b; }
+
+        /* تحكم PSP */
+        .psp-controller { background: #101014; border: 1px solid #27272a; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 10px; direction: ltr; }
+        .shoulders-row { display: flex; justify-content: space-between; gap: 12px; }
+        .shoulder-btn { flex: 1; height: 34px; background: #1b1b22; border: 1px solid #3f3f46; border-radius: 8px; color: #fff; font-weight: bold; }
+        .shoulder-btn.active { background: var(--neon-red); border-color: var(--neon-red); }
+
+        .main-controls-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .left-cluster { display: flex; align-items: center; gap: 10px; }
+
+        .analog-zone { position: relative; width: 90px; height: 90px; border-radius: 50%; background: radial-gradient(circle, #18181f 0%, #0e0e13 100%); border: 2px solid #2e2e38; display: flex; align-items: center; justify-content: center; }
+        .analog-stick { position: absolute; width: 40px; height: 40px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ff2a5f, #9e0026); border: 2px solid rgba(255, 255, 255, 0.2); transform: translate(0px, 0px); pointer-events: none; }
+
+        .dpad { position: relative; width: 100px; height: 100px; }
+        .dpad-btn { position: absolute; width: 34px; height: 34px; background: #1d1d24; border: 1px solid #3f3f46; color: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
+        .dpad-btn.up { top: 0; left: 33px; }
+        .dpad-btn.down { bottom: 0; left: 33px; }
+        .dpad-btn.left { top: 33px; left: 0; }
+        .dpad-btn.right { top: 33px; right: 0; }
+
+        .face-pad { position: relative; width: 100px; height: 100px; }
+        .face-btn { position: absolute; width: 34px; height: 34px; border-radius: 50%; background: #1d1d24; border: 1px solid #3f3f46; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: bold; }
+        .btn-tri { top: 0; left: 33px; color: #34d399; }
+        .btn-cir { top: 33px; right: 0; color: #f87171; }
+        .btn-crs { bottom: 0; left: 33px; color: #60a5fa; }
+        .btn-sqr { top: 33px; left: 0; color: #f472b6; }
+
+        .center-sys { display: flex; flex-direction: column; gap: 6px; }
+        .sys-btn { background: #1d1d24; border: 1px solid #3f3f46; color: var(--text-muted); padding: 6px 12px; border-radius: 15px; font-size: 0.65rem; font-weight: bold; }
+
+        .dpad-btn.active, .face-btn.active, .sys-btn.active { background: var(--neon-cyan); color: #000; border-color: var(--neon-cyan); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">PSP<span>ISO</span> ENGINE</div>
+        <div class="badge-group">
+            <div class="iso-badge">LOCAL FILE</div>
+            <div class="fps-badge">30+ FPS</div>
+        </div>
+    </header>
+
+    <div class="container" id="setupScreen">
+        
+        <!-- منطقة رفع الملف -->
+        <div class="upload-zone" id="dropZone" onclick="document.getElementById('isoInput').click()">
+            <div class="upload-icon">💿</div>
+            <div class="upload-title">اضغط هنا لاختيار لعبة PSP بصيغة (.ISO)</div>
+            <div class="upload-sub">سيتم قراءة اللعبة من ذاكرة هاتفك مباشرة (بدون إنترنت)</div>
+            <input type="file" id="isoInput" accept=".iso,application/x-iso9660-image">
+        </div>
+
+        <div class="settings-panel">
+            <div class="panel-title">⚙️ إعدادات الجودة</div>
+            <div class="settings-grid">
+                <div class="setting-item">
+                    <label>دقة العرض الداخلية:</label>
+                    <select id="resSelect">
+                        <option value="1" selected>1x PSP (480x272) - أسرع</option>
+                        <option value="2">2x PSP (960x544) - HD</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>فلترة الأنسجة:</label>
+                    <select id="filterSelect">
+                        <option value="Linear" selected>Linear (تنعيم)</option>
+                        <option value="Nearest">Nearest (أداء)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-bar" id="statusText">
+            جاهز للقراءة من ذاكرة الهاتف. اختر ملف <strong>.ISO</strong> للبدء.
+        </div>
+    </div>
+
+    <!-- شاشة اللعب -->
+    <div id="game-wrapper">
+        <div class="screen-container">
+            <div id="game"></div>
+        </div>
+
+        <div class="toolbar">
+            <button class="btn btn-cyan" onclick="toggleFullScreen()">⛶ شاشة كاملة</button>
+            <button class="btn btn-red" onclick="location.reload()">💿 خروج</button>
+        </div>
+
+        <div class="psp-controller">
+            <div class="shoulders-row">
+                <button class="shoulder-btn" data-key="q">L</button>
+                <button class="shoulder-btn" data-key="e">R</button>
+            </div>
+
+            <div class="main-controls-row">
+                <div class="left-cluster">
+                    <div class="analog-zone" id="analogZone">
+                        <div class="analog-stick" id="analogStick"></div>
+                    </div>
+                    <div class="dpad">
+                        <button class="dpad-btn up" data-key="ArrowUp">▲</button>
+                        <button class="dpad-btn left" data-key="ArrowLeft">◀</button>
+                        <button class="dpad-btn right" data-key="ArrowRight">▶</button>
+                        <button class="dpad-btn down" data-key="ArrowDown">▼</button>
+                    </div>
+                </div>
+
+                <div class="center-sys">
+                    <button class="sys-btn" data-key="Shift">SELECT</button>
+                    <button class="sys-btn" data-key="Enter">START</button>
+                </div>
+
+                <div class="face-pad">
+                    <button class="face-btn btn-tri" data-key="w">△</button>
+                    <button class="face-btn btn-sqr" data-key="a">□</button>
+                    <button class="face-btn btn-cir" data-key="d">○</button>
+                    <button class="face-btn btn-crs" data-key="s">✕</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const isoInput = document.getElementById('isoInput');
+        const dropZone = document.getElementById('dropZone');
+        const statusText = document.getElementById('statusText');
+
+        isoInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleIsoFile(e.target.files[0]);
+            }
+        });
+
+        // دالة معالجة الملف المحلي
+        async function handleIsoFile(file) {
+            if (!file.name.toLowerCase().endsWith('.iso')) {
+                statusText.innerHTML = `⚠️ يرجى اختيار ملف .iso فقط.`;
+                statusText.style.borderRightColor = "#ff003c";
+                return;
+            }
+
+            statusText.innerHTML = `جاري تجهيز الملف (${(file.size / (1024 * 1024)).toFixed(1)} MB)... الرجاء الانتظار`;
+            statusText.style.borderRightColor = "#00f3ff";
+
+            // 1. إخفاء واجهة الإعدادات
+            document.getElementById('setupScreen').style.display = 'none';
+            document.getElementById('game-wrapper').style.display = 'flex';
+
+            // 2. تجهيز رابط الملف المحلي
+            const isoURL = URL.createObjectURL(file);
+            const cleanName = file.name.replace(/\.iso$/i, '');
+
+            const resScale = document.getElementById('resSelect').value;
+            const texFilter = document.getElementById('filterSelect').value;
+
+            // 3. إعداد EmulatorJS
+            window.EJS_player = '#game';
+            window.EJS_core = 'psp';              
+            window.EJS_threads = true;            // إلزامي
+            window.EJS_gameName = cleanName;
+            window.EJS_gameUrl = isoURL;          // هنا يتم تمرير الملف المحلي
+            window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/'; 
+            window.EJS_startOnLoaded = true;
+            window.EJS_color = '#ff003c';
+            window.EJS_VirtualGamepadSettings = false; 
+
+            window.EJS_defaultOptions = {
+                'ppsspp_internal_resolution': `${resScale * 480}x${resScale * 272}`,
+                'ppsspp_texture_filtering': texFilter,
+            };
+
+            // 4. تحميل المحاكي
+            const script = document.createElement('script');
+            script.src = 'https://cdn.emulatorjs.org/stable/data/loader.js';
+            script.onload = () => {
+                statusText.innerHTML = `يعمل الآن: <strong>${file.name}</strong>`;
+            };
+            script.onerror = () => {
+                alert("فشل الاتصال بالسيرفر لتحميل ملفات المحاكي. يرجى التأكد من اتصالك بالإنترنت.");
+            };
+            document.body.appendChild(script);
+        }
+
+        // برمجة أزرار التحكم
+        function sendKey(type, key) {
+            const event = new KeyboardEvent(type, { key: key, bubbles: true, cancelable: true });
+            document.dispatchEvent(event);
+            const iframe = document.querySelector('#game iframe');
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.dispatchEvent(event);
+            }
+        }
+
+        document.querySelectorAll('[data-key]').forEach(btn => {
+            const key = btn.getAttribute('data-key');
+            const press = (e) => { e.preventDefault(); btn.classList.add('active'); sendKey('keydown', key); };
+            const release = (e) => { e.preventDefault(); btn.classList.remove('active'); sendKey('keyup', key); };
+            btn.addEventListener('pointerdown', press);
+            btn.addEventListener('pointerup', release);
+            btn.addEventListener('pointerleave', release);
+            btn.addEventListener('pointercancel', release);
+        });
+
+        // برمجة عصا الأنالوج
+        const analogZone = document.getElementById('analogZone');
+        const analogStick = document.getElementById('analogStick');
+        let activeAnalog = null;
+        let currentDirs = { up: false, down: false, left: false, right: false };
+
+        function updateAnalog(clientX, clientY) {
+            const rect = analogZone.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const maxRadius = rect.width * 0.35;
+
+            let dx = clientX - centerX;
+            let dy = clientY - centerY;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist > maxRadius) { dx = (dx / dist) * maxRadius; dy = (dy / dist) * maxRadius; }
+            analogStick.style.transform = `translate(${dx}px, ${dy}px)`;
+
+            const threshold = maxRadius * 0.4;
+            const nextDirs = {
+                up: dy < -threshold, down: dy > threshold, left: dx < -threshold, right: dx > threshold
+            };
+            const keyMap = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
+
+            for (const dir in keyMap) {
+                if (nextDirs[dir] && !currentDirs[dir]) sendKey('keydown', keyMap[dir]);
+                if (!nextDirs[dir] && currentDirs[dir]) sendKey('keyup', keyMap[dir]);
+            }
+            currentDirs = nextDirs;
+        }
+
+        analogZone.addEventListener('pointerdown', (e) => {
+            e.preventDefault(); activeAnalog = e.pointerId; analogZone.setPointerCapture(e.pointerId); updateAnalog(e.clientX, e.clientY);
+        });
+        analogZone.addEventListener('pointermove', (e) => {
+            if (e.pointerId !== activeAnalog) return;
+            e.preventDefault(); updateAnalog(e.clientX, e.clientY);
+        });
+        analogZone.addEventListener('pointerup', (e) => {
+            if (e.pointerId === activeAnalog) {
+                analogStick.style.transform = `translate(0px, 0px)`;
+                for (const dir in currentDirs) { if (currentDirs[dir]) sendKey('keyup', { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' }[dir]); }
+                currentDirs = { up: false, down: false, left: false, right: false };
+                activeAnalog = null;
+            }
+        });
+
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(() => {}); }
+            else { if (document.exitFullscreen) document.exitFullscreen(); }
+        }
+    </script>
+</body>
+</html>
